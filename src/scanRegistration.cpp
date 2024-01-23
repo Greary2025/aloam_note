@@ -1,10 +1,9 @@
 // This is an advanced implementation of the algorithm described in the following paper:
 //   J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time.
-//     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014. 
+//     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014.
 
 // Modifier: Tong Qin               qintonguav@gmail.com
 // 	         Shaozu Cao 		    saozu.cao@connect.ust.hk
-
 
 // Copyright 2013, Ji Zhang, Carnegie Mellon University
 // Further contributions copyright (c) 2016, Southwest Research Institute
@@ -40,9 +39,10 @@
 #include <vector>
 // 字符串
 #include <string>
+// 自定义的两个文件，在include/aloam_velodyne目录下
 //
 #include "aloam_velodyne/common.h"
-//
+// 该文件定义了时间的记录
 #include "aloam_velodyne/tic_toc.h"
 //
 #include <nav_msgs/Odometry.h>
@@ -64,9 +64,9 @@
 #include <sensor_msgs/Imu.h>
 // 传感器3D点云信息
 #include <sensor_msgs/PointCloud2.h>
-// 
+//
 #include <tf/transform_datatypes.h>
-// 
+//
 #include <tf/transform_broadcaster.h>
 
 // 三角函数的命名空间
@@ -76,7 +76,7 @@ using std::sin;
 // 激光雷达的扫描频率
 const double scanPeriod = 0.1;
 // 系统延迟，等几帧再进行运行
-const int systemDelay = 0; 
+const int systemDelay = 0;
 // 若等待时间不为0，需要开始等待计数，到一定数目运行
 int systemInitCount = 0;
 // 系统初始化
@@ -98,7 +98,7 @@ int cloudNeighborPicked[400000];
 int cloudLabel[400000];
 // 按照comp函数排序：曲率从小到大
 // 这个函数只是给出sort排序函数的约束：排序的规则
-bool comp (int i,int j) { return (cloudCurvature[i]<cloudCurvature[j]); }
+bool comp(int i, int j) { return (cloudCurvature[i] < cloudCurvature[j]); }
 
 // 定义几个发布者，发布处理分类过的点云信息
 // 全部点云信息
@@ -118,12 +118,12 @@ std::vector<ros::Publisher> pubEachScan;
 // 是否发布每线的激光雷达数据，不发布
 bool PUB_EACH_LINE = false;
 // 去除较近的无效点时，距离原点的距离
-double MINIMUM_RANGE = 0.1; 
+double MINIMUM_RANGE = 0.1;
 // 定义类模板
 template <typename PointT>
 // 去除无效点云的函数
 void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
-                              pcl::PointCloud<PointT> &cloud_out, float thres)
+                            pcl::PointCloud<PointT> &cloud_out, float thres)
 {
     // 假如输入输出点云不使用同一个变量，则需要将输出点云的时间戳和容器大小与输入点云同步
     // 如果输入点云和输出点云不同
@@ -143,7 +143,7 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
         //
         if (cloud_in.points[i].x * cloud_in.points[i].x + cloud_in.points[i].y * cloud_in.points[i].y + cloud_in.points[i].z * cloud_in.points[i].z < thres * thres)
             continue;
-            //
+        //
         cloud_out.points[j] = cloud_in.points[i];
         //
         j++;
@@ -161,7 +161,7 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
     //
     cloud_out.is_dense = true;
 }
-//当激光雷达发布一帧（sweep）数据，计入回调函数
+// 当激光雷达发布一帧（sweep）数据，计入回调函数
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 {
     // 系统是否是第一次运行
@@ -183,7 +183,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     // 定义一个类用于计时
     //
     TicToc t_whole;
-    //同上，记录准备时间，尤其是点云的分类
+    // 同上，记录准备时间，尤其是点云的分类
     TicToc t_prepare;
     // 开始记录所有有效点的曲率
     // 曲率开始的索引值（2维数组：16线，每线一个开始值）
@@ -202,7 +202,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices);
     // 去除在原点附近的点云
     removeClosedPointCloud(laserCloudIn, laserCloudIn, MINIMUM_RANGE);
-    
+
     // 将激光点分类
     // 根据激光雷达模型，获得每个激光点的scanID以及扫描时间
     // velodyne 16雷达每次返回的数据称为一帧（sweep），一帧由16条线组成（每条线称为一个scan），每个scan有很多点。
@@ -290,7 +290,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         else if (N_SCANS == 32)
         {
             //
-            scanID = int((angle + 92.0/3.0) * 3.0 / 4.0);
+            scanID = int((angle + 92.0 / 3.0) * 3.0 / 4.0);
             //
             if (scanID > (N_SCANS - 1) || scanID < 0)
             {
@@ -304,7 +304,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             //
             if (angle >= -8.83)
                 scanID = int((2 - angle) * 3.0 + 0.5);
-                //
+            //
             else
                 scanID = N_SCANS / 2 + int((-8.83 - angle) * 2.0 + 0.5);
 
@@ -316,7 +316,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                 continue;
             }
         }
-        //如果不是16线的激光雷达，或32、64，就不能进行运算
+        // 如果不是16线的激光雷达，或32、64，就不能进行运算
         else
         {
             printf("wrong scan number\n");
@@ -376,7 +376,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         // scanPeriod是扫描频率，0.1
         point.intensity = scanID + scanPeriod * relTime;
         // 将点云押入laserCloudScans
-        laserCloudScans[scanID].push_back(point); 
+        laserCloudScans[scanID].push_back(point);
     }
     // 有点云在计算中超出范围：超出线数的俯仰角度，或者线转角度有问题
     // count记录的是绝对有效的点云个数
@@ -437,23 +437,23 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     {
         // 如果一条线上开始到结束小于6个，无法做梯度，做差，计算曲率
         // 如果最后一个可算曲率的点与第一个的差小于6，说明无法分成6个扇区，跳过
-        if( scanEndInd[i] - scanStartInd[i] < 6)
+        if (scanEndInd[i] - scanStartInd[i] < 6)
             continue;
         // 创造该类型指针，指向次平面点云集合（误解）
-        // 
+        //
         pcl::PointCloud<PointType>::Ptr surfPointsLessFlatScan(new pcl::PointCloud<PointType>);
         // 为了使特征点均匀分布，将一个scan分成6个扇区
         for (int j = 0; j < 6; j++)
         {
             // 计算每个扇区的起点
-            int sp = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * j / 6; 
+            int sp = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * j / 6;
             // 计算每个扇区的终点
             int ep = scanStartInd[i] + (scanEndInd[i] - scanStartInd[i]) * (j + 1) / 6 - 1;
             // 创建类记录处理时间
             TicToc t_tmp;
             // 按照曲率进行升序排序
             // sort排序，comp函数中的方法排序
-            std::sort (cloudSortInd + sp, cloudSortInd + ep + 1, comp);
+            std::sort(cloudSortInd + sp, cloudSortInd + ep + 1, comp);
             // 当前扇区的处理时间
             // t_q_sort累计每个扇区曲率排序时间总和
             t_q_sort += t_tmp.toc();
@@ -465,7 +465,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             for (int k = ep; k >= sp; k--)
             {
                 // 获取当前索引值
-                int ind = cloudSortInd[k]; 
+                int ind = cloudSortInd[k];
                 // 默认的cloudNeighborPicked是0
                 // 意思是未打标签
                 // 若最大曲率小于0.1，可认为是平面点
@@ -487,9 +487,9 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                     }
                     // 选取20个次角点
                     else if (largestPickedNum <= 20)
-                    {            
-                        // 标签设置为1           
-                        cloudLabel[ind] = 1; 
+                    {
+                        // 标签设置为1
+                        cloudLabel[ind] = 1;
                         // 押入次角点点云集合
                         cornerPointsLessSharp.push_back(laserCloud->points[ind]);
                     }
@@ -498,7 +498,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                         break;
                     }
                     // 标记该点已经打过标签
-                    cloudNeighborPicked[ind] = 1; 
+                    cloudNeighborPicked[ind] = 1;
                     // ID为ind的特征点的相邻scan点距离的平方 <= 0.05的点标记为选择过，避免特征点密集分布
                     // 为避免特征点密布，立刻计算附近的曲率，如果相差不大，则也标为标记过
                     // 为什么不用之前计算的曲率？查不到吗？
@@ -554,14 +554,14 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
                     cloudCurvature[ind] < 0.1)
                 {
                     // 标签设置为-1
-                    cloudLabel[ind] = -1; 
+                    cloudLabel[ind] = -1;
                     // 押入平面点点云
                     surfPointsFlat.push_back(laserCloud->points[ind]);
-                    //平面点计数
+                    // 平面点计数
                     smallestPickedNum++;
                     // 平面点4个
                     if (smallestPickedNum >= 4)
-                    { 
+                    {
                         break;
                     }
                     // 该点已选择
@@ -653,7 +653,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     pubLaserCloud.publish(laserCloudOutMsg);
     // 角点的发布过程
     sensor_msgs::PointCloud2 cornerPointsSharpMsg;
-    // 
+    //
     pcl::toROSMsg(cornerPointsSharp, cornerPointsSharpMsg);
     //
     cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
@@ -693,10 +693,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
     // 如果发布每条线
     // pub each scam
-    if(PUB_EACH_LINE)
+    if (PUB_EACH_LINE)
     {
         //
-        for(int i = 0; i< N_SCANS; i++)
+        for (int i = 0; i < N_SCANS; i++)
         {
             //
             sensor_msgs::PointCloud2 scanMsg;
@@ -716,7 +716,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     // 大概因为激光雷达的帧率，0.1s可能第二帧激光雷达数据来了（错）
     // ros::spin();和ros::Rate loop_rate(10);有关
     // 每0.1s进一次处理消息队列
-    if(t_whole.toc() > 100)
+    if (t_whole.toc() > 100)
         ROS_WARN("scan registration process over 100ms");
 }
 
@@ -733,7 +733,7 @@ int main(int argc, char **argv)
     // 输出N_SCANS
     printf("scan line number %d \n", N_SCANS);
     // 一般3D激光雷达分为16线，32，64
-    if(N_SCANS != 16 && N_SCANS != 32 && N_SCANS != 64)
+    if (N_SCANS != 16 && N_SCANS != 32 && N_SCANS != 64)
     {
         printf("only support velodyne with 16, 32 or 64 scan line!");
         return 0;
@@ -759,10 +759,10 @@ int main(int argc, char **argv)
     pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);
     // 是否发布每行数据
     // 存疑：这里是false
-    if(PUB_EACH_LINE)
+    if (PUB_EACH_LINE)
     {
         // 逐行发布
-        for(int i = 0; i < N_SCANS; i++)
+        for (int i = 0; i < N_SCANS; i++)
         {
             // 定义发布者，tmp 发布16行数据，话题名为/laser_scanid_1，/laser_scanid_2，。。。
             ros::Publisher tmp = nh.advertise<sensor_msgs::PointCloud2>("/laser_scanid_" + std::to_string(i), 100);
