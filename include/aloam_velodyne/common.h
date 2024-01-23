@@ -42,16 +42,18 @@
 #include <cmath>
 // 包含PCL点云的基本类型，如PointXYZ,PointXYZI,PointXYZRGBA,PointNormal等点云类型
 #include <pcl/point_types.h>
-// 
+// typedef
+// 定义一种类型的别名，而不只是简单的宏替换。
+// 可以用作同时声明指针型的多个对象。
 typedef pcl::PointXYZI PointType;
 //Members: float x, y, z, uin32_t label
-// 
+// 弧度转换为角度
 inline double rad2deg(double radians)
 {
   // 
   return radians * 180.0 / M_PI;
 }
-// 
+// 角度转换为弧度
 inline double deg2rad(double degrees)
 {
   // 

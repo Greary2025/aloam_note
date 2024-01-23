@@ -12,8 +12,10 @@
 class TicToc
 {
   public:
+  // 构造函数
     TicToc()
     {
+      // 开始就调用tic(),用于记录开始的时间
         tic();
     }
     // 获取系统时间
@@ -34,5 +36,6 @@ class TicToc
 
   private:
   // 定义计时开始和结束的两个变量
+  // 
     std::chrono::time_point<std::chrono::system_clock> start, end;
 };

@@ -33,30 +33,38 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-//
+// C++标准库，引用三角函数
 #include <cmath>
 // 迭代器
 #include <vector>
 // 字符串
 #include <string>
 // 自定义的两个文件，在include/aloam_velodyne目录下
-//
+// 该文件自己写了度数和角度的转换函数
 #include "aloam_velodyne/common.h"
 // 该文件定义了时间的记录
 #include "aloam_velodyne/tic_toc.h"
-//
+// nav_msgs包含导航功能包、调用其中的odometry里程计
 #include <nav_msgs/Odometry.h>
-//
+// 调用opencv库
+// 图像处理库
 #include <opencv2/imgproc.hpp>
-//
+// 进行PCL文件的数据类型转换
 #include <pcl_conversions/pcl_conversions.h>
-//
+// PCL点云文件
 #include <pcl/point_cloud.h>
-//
+// PCL点云的类型
 #include <pcl/point_types.h>
-//
+// PCL滤波（去除无效点）：使用的是体素滤波器
 #include <pcl/filters/voxel_grid.h>
-//
+// KD树
+// 参考https://oi-wiki.org/ds/kdt/
+// k-D Tree 具有二叉搜索树的形态，
+// 二叉搜索树上的每个结点都对应 k 维空间内的一个点。
+// 其每个子树中的点都在一个 k 维的超长方体内，
+// 这个超长方体内的所有点也都在这个子树中。
+// 具体解释https://zhuanlan.zhihu.com/p/617234731
+// 下面的点云索引用的就是这个技术
 #include <pcl/kdtree/kdtree_flann.h>
 // ros系统
 #include <ros/ros.h>
@@ -64,9 +72,10 @@
 #include <sensor_msgs/Imu.h>
 // 传感器3D点云信息
 #include <sensor_msgs/PointCloud2.h>
-//
+// 该头文件定义了如下数据
+// Quaternion（四元数）, Vector（向量）, Point（点）, Pose（位姿）, Transform（转移矩阵）
 #include <tf/transform_datatypes.h>
-//
+// 位姿广播
 #include <tf/transform_broadcaster.h>
 
 // 三角函数的命名空间
@@ -121,7 +130,7 @@ bool PUB_EACH_LINE = false;
 double MINIMUM_RANGE = 0.1;
 // 定义类模板
 template <typename PointT>
-// 去除无效点云的函数
+// 去除无效点云的函数（输入点云的引用，输出点云的引用，距离）
 void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
                             pcl::PointCloud<PointT> &cloud_out, float thres)
 {
@@ -137,29 +146,33 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
     }
     // 输出点云计数（过滤掉后数目减小）
     size_t j = 0;
-    //
+    //遍历所有点云
     for (size_t i = 0; i < cloud_in.points.size(); ++i)
     {
-        //
+        // 计算在半径为thres的球内的点云
         if (cloud_in.points[i].x * cloud_in.points[i].x + cloud_in.points[i].y * cloud_in.points[i].y + cloud_in.points[i].z * cloud_in.points[i].z < thres * thres)
+            // 不进行记录
             continue;
-        //
+        // 进行记录球外点云
         cloud_out.points[j] = cloud_in.points[i];
-        //
+        // 和i++同步
         j++;
     }
     //
     if (j != cloud_in.points.size())
     {
-        //
+        // 重新计算输出点云的大小
         cloud_out.points.resize(j);
     }
-    //
+    // 设为一行，j列的矩阵
+    // 无结构点云
     cloud_out.height = 1;
     //
     cloud_out.width = static_cast<uint32_t>(j);
-    //
+    // 判断点云中的点是否包含 Inf/NaN这种值
+    // 不包含为true
     cloud_out.is_dense = true;
+    // 其实无效数据没有去除干净
 }
 // 当激光雷达发布一帧（sweep）数据，计入回调函数
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
@@ -198,10 +211,12 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     // 首先对点云滤波，去除NaN(不是数）值得无效点云，以及在Lidar坐标系原点MINIMUM_RANGE距离以内的点
     // 创建一个数组，记录去除的点云索引值
     std::vector<int> indices;
-    // 去除无效点云
+    // 去除无效点云（NAN点）
+    // 分别为输入点云，输出点云及对应保留的索引
     pcl::removeNaNFromPointCloud(laserCloudIn, laserCloudIn, indices);
     // 去除在原点附近的点云
     removeClosedPointCloud(laserCloudIn, laserCloudIn, MINIMUM_RANGE);
+    // 没有去除错点，杂点
 
     // 将激光点分类
     // 根据激光雷达模型，获得每个激光点的scanID以及扫描时间
@@ -232,6 +247,8 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     // 处理  保证  M_PI < endOri - startOri < 3 * M_PI
     // 原因：机关雷达一帧数据一定是扫描一圈以上，理论上是整数圈，扰动等，有误差（错）
     // 考虑旋转开始角和结束的相限关系来理解（对）
+    // 虽然 负角度代表反方向转，但是不能被用来分配相对时间
+    // 为了分配相对时间，旋转角度必须为正（即使是错的）
     // 参考https://zhuanlan.zhihu.com/p/395196484
     // 扫描场在右半部分（一、四象限）的情况
     if (endOri - startOri > 3 * M_PI)
@@ -248,13 +265,15 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     // 输出最后角度
     // printf("end Ori %f\n", endOri);
     // lidar扫描线是否旋转过半，先默认没有
+    // 这里会导致旋转角度出现错误，但是只要是正数就可以
     bool halfPassed = false;
     // 点云大小
     int count = cloudSize;
     // 定义点云的一个点
     PointType point;
     // 定义雷达线束，动态数组集合
-    // 生成16个点云
+    // 生成16线点云
+    // 这里N_SCANS来自launch文件
     std::vector<pcl::PointCloud<PointType>> laserCloudScans(N_SCANS);
     // 开始遍历每个点
     for (int i = 0; i < cloudSize; i++)
@@ -279,6 +298,8 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             // 除2是因为每两个scan之间的间隔为2度，scanID设定为相差1
             // + 0.5 是用于四舍五入   因为 int 只会保留整数部分
             scanID = int((angle + 15) / 2 + 0.5);
+            // 更新后的ID:0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5
+            // 差值为1
             // 超过16线或者小于16线，则不标定
             if (scanID > (N_SCANS - 1) || scanID < 0)
             {
@@ -324,6 +345,9 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         }
         // 输出角度值和scanID
         // printf("angle %f scanID %d \n", angle, scanID);
+        // 可以看到atan2( )默认返回逆时针角度，
+        // 由于LiDAR通常是顺时针扫描，
+        // 所以往往使用-atan2( )函数。
         // 计算平面角度，即在某条线上
         float ori = -atan2(point.y, point.x);
         // 是否转过半圈，halfPassed默认值：false
