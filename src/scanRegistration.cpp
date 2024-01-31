@@ -146,7 +146,7 @@ void removeClosedPointCloud(const pcl::PointCloud<PointT> &cloud_in,
     }
     // 输出点云计数（过滤掉后数目减小）
     size_t j = 0;
-    //遍历所有点云
+    // 遍历所有点云
     for (size_t i = 0; i < cloud_in.points.size(); ++i)
     {
         // 计算在半径为thres的球内的点云

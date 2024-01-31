@@ -1,10 +1,9 @@
 // This is an advanced implementation of the algorithm described in the following paper:
 //   J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time.
-//     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014. 
+//     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014.
 
 // Modifier: Tong Qin               qintonguav@gmail.com
 // 	         Shaozu Cao 		    saozu.cao@connect.ust.hk
-
 
 // Copyright 2013, Ji Zhang, Carnegie Mellon University
 // Further contributions copyright (c) 2016, Southwest Research Institute
@@ -34,48 +33,57 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+// 包含数学库
+// 方便调试
 #include <cmath>
-// 
+// nav_msgs是ros中的导航库
+// Odometry是里程计信息
 #include <nav_msgs/Odometry.h>
-// 
+// nav_msgs/path.h是ROS（机器人操作系统）中的一个包含路径信息的消息类型。
+// 该消息类型包含了机器人在二维或三维空间中运动所经过的一系列点。
 #include <nav_msgs/Path.h>
-// 
+// 位姿信息的库函数
 #include <geometry_msgs/PoseStamped.h>
-// 
+// PCL点云库
 #include <pcl/point_cloud.h>
-// 
+// PCL点云类型
 #include <pcl/point_types.h>
-// 
+// 体素滤波器，主要是降低特征点，利用几个特征点的平均几何重心来代替这些特征点
 #include <pcl/filters/voxel_grid.h>
-// 
+// kdtree进行分类检索
 #include <pcl/kdtree/kdtree_flann.h>
-// 
+// PCL点云转换
 #include <pcl_conversions/pcl_conversions.h>
-// 
+// ros头文件，信息发布和接收
 #include <ros/ros.h>
-// 
+// 传感器，IMU，角度传感器信息库
 #include <sensor_msgs/Imu.h>
-// 
+// 传感器，点云信息
 #include <sensor_msgs/PointCloud2.h>
-// 
+// 位姿，旋转矩阵，数据类型
 #include <tf/transform_datatypes.h>
-// 
+// tf，位姿广播
 #include <tf/transform_broadcaster.h>
 // 矩阵运算的Dence模块，应该负责求逆等运算
 #include <eigen3/Eigen/Dense>
-// 
+// C++多线程，互斥锁提供了排他性的、非递归的所有权语义
+// https://zhuanlan.zhihu.com/p/598993031
+// lock()，调用线程将锁住该互斥量。线程调用该函数会发生下面 3 种情况：
+// (1). 如果该互斥量当前没 有被锁住，则调用线程将该互斥量锁住，直到调用 unlock之前，该线程一直拥有该锁。
+// (2). 如果当 前互斥量被其他线程锁住，则当前的调用线程被阻塞住。
+// (3). 如果当前互斥量被当前调用线程锁 住，则会产生死锁(deadlock)。
+// unlock()， 解锁，释放对互斥量的所有权。
 #include <mutex>
-// 
+//
 #include <queue>
 // 包含common.h的头文件，
 #include "aloam_velodyne/common.h"
 // 包含tic_toc.h，统计时间，目的，同步数据，防止在0.1s中没有开题
 #include "aloam_velodyne/tic_toc.h"
-// 
+//
 #include "lidarFactor.hpp"
 
 #define DISTORTION 0
-
 
 int corner_correspondence = 0, plane_correspondence = 0;
 
@@ -128,13 +136,13 @@ std::mutex mBuf;
 // undistort lidar point
 void TransformToStart(PointType const *const pi, PointType *const po)
 {
-    //interpolation ratio
+    // interpolation ratio
     double s;
     if (DISTORTION)
         s = (pi->intensity - int(pi->intensity)) / SCAN_PERIOD;
     else
         s = 1.0;
-    //s = 1;
+    // s = 1;
     Eigen::Quaterniond q_point_last = Eigen::Quaterniond::Identity().slerp(s, q_last_curr);
     Eigen::Vector3d t_point_last = s * t_last_curr;
     Eigen::Vector3d point(pi->x, pi->y, pi->z);
@@ -161,7 +169,7 @@ void TransformToEnd(PointType const *const pi, PointType *const po)
     po->y = point_end.y();
     po->z = point_end.z();
 
-    //Remove distortion time info
+    // Remove distortion time info
     po->intensity = int(pi->intensity);
 }
 
@@ -193,7 +201,7 @@ void laserCloudLessFlatHandler(const sensor_msgs::PointCloud2ConstPtr &surfPoint
     mBuf.unlock();
 }
 
-//receive all point cloud
+// receive all point cloud
 void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudFullRes2)
 {
     mBuf.lock();
@@ -298,7 +306,7 @@ int main(int argc, char **argv)
                     corner_correspondence = 0;
                     plane_correspondence = 0;
 
-                    //ceres::LossFunction *loss_function = NULL;
+                    // ceres::LossFunction *loss_function = NULL;
                     ceres::LossFunction *loss_function = new ceres::HuberLoss(0.1);
                     ceres::LocalParameterization *q_parameterization =
                         new ceres::EigenQuaternionParameterization();
@@ -476,17 +484,17 @@ int main(int argc, char **argv)
                             {
 
                                 Eigen::Vector3d curr_point(surfPointsFlat->points[i].x,
-                                                            surfPointsFlat->points[i].y,
-                                                            surfPointsFlat->points[i].z);
+                                                           surfPointsFlat->points[i].y,
+                                                           surfPointsFlat->points[i].z);
                                 Eigen::Vector3d last_point_a(laserCloudSurfLast->points[closestPointInd].x,
-                                                                laserCloudSurfLast->points[closestPointInd].y,
-                                                                laserCloudSurfLast->points[closestPointInd].z);
+                                                             laserCloudSurfLast->points[closestPointInd].y,
+                                                             laserCloudSurfLast->points[closestPointInd].z);
                                 Eigen::Vector3d last_point_b(laserCloudSurfLast->points[minPointInd2].x,
-                                                                laserCloudSurfLast->points[minPointInd2].y,
-                                                                laserCloudSurfLast->points[minPointInd2].z);
+                                                             laserCloudSurfLast->points[minPointInd2].y,
+                                                             laserCloudSurfLast->points[minPointInd2].z);
                                 Eigen::Vector3d last_point_c(laserCloudSurfLast->points[minPointInd3].x,
-                                                                laserCloudSurfLast->points[minPointInd3].y,
-                                                                laserCloudSurfLast->points[minPointInd3].z);
+                                                             laserCloudSurfLast->points[minPointInd3].y,
+                                                             laserCloudSurfLast->points[minPointInd3].z);
 
                                 double s;
                                 if (DISTORTION)
@@ -500,7 +508,7 @@ int main(int argc, char **argv)
                         }
                     }
 
-                    //printf("coner_correspondance %d, plane_correspondence %d \n", corner_correspondence, plane_correspondence);
+                    // printf("coner_correspondance %d, plane_correspondence %d \n", corner_correspondence, plane_correspondence);
                     printf("data association time %f ms \n", t_data.toc());
 
                     if ((corner_correspondence + plane_correspondence) < 10)
@@ -609,7 +617,7 @@ int main(int argc, char **argv)
             }
             printf("publication time %f ms \n", t_pub.toc());
             printf("whole laserOdometry time %f ms \n \n", t_whole.toc());
-            if(t_whole.toc() > 100)
+            if (t_whole.toc() > 100)
                 ROS_WARN("odometry process over 100ms");
 
             frameCount++;
