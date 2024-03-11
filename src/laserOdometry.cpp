@@ -74,8 +74,14 @@
 // (2). 如果当 前互斥量被其他线程锁住，则当前的调用线程被阻塞住。
 // (3). 如果当前互斥量被当前调用线程锁 住，则会产生死锁(deadlock)。
 // unlock()， 解锁，释放对互斥量的所有权。
+// C++11提供如下4种语义的互斥量（mutex） ：
+
+// std::mutex，独占的互斥量，不能递归使用。
+// std::time_mutex，带超时的独占互斥量，不能递归使用。
+// std::recursive_mutex，递归互斥量，不带超时功能。
+// std::recursive_timed_mutex，带超时的递归互斥量。
 #include <mutex>
-//
+// 队列容器
 #include <queue>
 // 包含common.h的头文件，
 #include "aloam_velodyne/common.h"
