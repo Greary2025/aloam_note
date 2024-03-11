@@ -1,10 +1,9 @@
 // This is an advanced implementation of the algorithm described in the following paper:
 //   J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time.
-//     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014. 
+//     Robotics: Science and Systems Conference (RSS). Berkeley, CA, July 2014.
 
 // Modifier: Tong Qin               qintonguav@gmail.com
 // 	         Shaozu Cao 		    saozu.cao@connect.ust.hk
-
 
 // Copyright 2013, Ji Zhang, Carnegie Mellon University
 // Further contributions copyright (c) 2016, Southwest Research Institute
@@ -45,17 +44,18 @@
 // typedef
 // 定义一种类型的别名，而不只是简单的宏替换。
 // 可以用作同时声明指针型的多个对象。
+// 在scanRegistration中有应用
 typedef pcl::PointXYZI PointType;
-//Members: float x, y, z, uin32_t label
-// 弧度转换为角度
+// Members: float x, y, z, uin32_t label
+//  弧度转换为角度
 inline double rad2deg(double radians)
 {
-  // 
+  //
   return radians * 180.0 / M_PI;
 }
 // 角度转换为弧度
 inline double deg2rad(double degrees)
 {
-  // 
+  //
   return degrees * M_PI / 180.0;
 }

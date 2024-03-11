@@ -51,6 +51,7 @@
 // 体素滤波器，主要是降低特征点，利用几个特征点的平均几何重心来代替这些特征点
 #include <pcl/filters/voxel_grid.h>
 // kdtree进行分类检索
+// https://blog.csdn.net/lemonxiaoxiao/article/details/106073531
 #include <pcl/kdtree/kdtree_flann.h>
 // PCL点云转换
 #include <pcl_conversions/pcl_conversions.h>
