@@ -1,7 +1,11 @@
 <?xml version="1.0"?>
+ <!-- 这是定义文档语法的语句，上面内容表示内容遵循xml的1.0版本。 -->
+
 <package>
+<!-- 功能包名称，默认为创建时的名称，可以随时更改。 -->
   <name>aloam_velodyne</name>
   <version>0.0.0</version>
+  <!-- package.xml是ROS必要的配置文件，它包含功能包信息，包括功能包名称、作者、许可证和依赖功能包。 -->
 
   <description>
     This is an advanced implentation of LOAM.
@@ -16,17 +20,39 @@
 
   <author email="zhangji@cmu.edu">Ji Zhang</author>
   
+  <!-- build_depend:构建依赖关系，使用某种特定的依赖关系来构建包。 -->
+  <!-- catkin编译 -->
   <buildtool_depend>catkin</buildtool_depend>
+  <!-- 位姿信息 -->
   <build_depend>geometry_msgs</build_depend>
+  <!-- 里程计信息，一般也调用位姿信息 -->
   <build_depend>nav_msgs</build_depend>
+  <!-- ROS下的C++ -->
   <build_depend>roscpp</build_depend>
+  <!-- ROS下的python -->
   <build_depend>rospy</build_depend>
-  <build_depend>std_msgs</build_depend>  
+  <!-- 标准信息：话题，节点的 -->
+  <build_depend>std_msgs</build_depend>
+  <!-- 点云录制的包 -->
   <build_depend>rosbag</build_depend>
+  <!-- 传感器信息 -->
   <build_depend>sensor_msgs</build_depend>
+  <!-- 转换矩阵等信息
+1 TF是ROS的一个包（package）
+2.TF能让用户随时记录各种坐标系之间的变换关系
+3.TF能让用户在一个坐标系中进行坐标运算，并将转换关系后的位置关系传到另一个坐标系 -->
   <build_depend>tf</build_depend>
+  <!-- 图像转换，ros点云和PCL点云之间的转换 -->
   <build_depend>image_transport</build_depend>
   
+  <!-- build_export_depend:构建导出依赖关系，如果功能包导出头文件，则其他包可能需要这个包，就应该使用这个标签，用来传递声明。 -->
+
+  <!-- exec_depend: 执行依赖关系指定在此程序包中运行代码所需的软件包。如动态链接库、可执行文件、Python模块、脚本文件等。 -->
+
+  <!-- depend:等于以上三种depend的合集，通常使用它添加ROS功能包，是常用而简便的方法。 -->
+
+<!-- run_depend:指定运行此包中的代码或针对此包构建库所需的包。当您依赖共享库或传递性地将其标头包含在此包的公共标头中时
+（特别是当这些包在 CMake 中的 catkin_package() 中声明为 (CATKIN_)DEPENDS 时），就会出现这种情况。 -->
   <run_depend>geometry_msgs</run_depend>
   <run_depend>nav_msgs</run_depend>
   <run_depend>sensor_msgs</run_depend>
@@ -37,6 +63,7 @@
   <run_depend>tf</run_depend>
   <run_depend>image_transport</run_depend>
 
+<!-- 元包是一个普通打的包 -->
   <export>
   </export>
 </package>

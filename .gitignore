@@ -1,0 +1,5 @@
+.git/
+.vscode/
+build/
+.idea/
+folder-alias.json

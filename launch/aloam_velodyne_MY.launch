@@ -1,0 +1,35 @@
+<launch>
+    <!-- 仍使用16线雷达 -->
+    <param name="scan_line" type="int" value="16" />
+
+    <!-- if 1, do mapping 10 Hz, if 2, do mapping 5 Hz. Suggest to use 1, it will adjust frequence automaticlly -->
+    <!-- 绘制地图的频率（分频，1分频是10HZ，2分频是5HZ） -->
+    <!-- 同时，也在位姿估计速率中重复使用，位姿估计速率默认二分频 -->
+    <param name="mapping_skip_frame" type="int" value="1" />
+
+    <!-- remove too closed points -->
+    <!-- 去除最近的点，在src/scanRegistration.cpp中使用 -->
+    <param name="minimum_range" type="double" value="0.3"/>
+
+    <!-- 设置体素滤波参数 -->
+    <!-- 线特征分辨率 -->
+    <param name="mapping_line_resolution" type="double" value="0.2"/>
+    <!-- 面特征分辨率 -->
+    <param name="mapping_plane_resolution" type="double" value="0.4"/>
+    <!-- 启动ascanRegistration的程序，节点文件 -->
+    <node pkg="aloam_velodyne" type="ascanRegistration" name="ascanRegistration" output="screen" />
+    <!--  -->
+    <node pkg="aloam_velodyne" type="alaserOdometry" name="alaserOdometry" output="screen" />
+    <!--  -->
+    <node pkg="aloam_velodyne" type="alaserMapping" name="alaserMapping" output="screen" />
+    <!-- 改变建图的节点名，适用于自己的程序 -->
+    <remap from="velo_link" to="velodyne" />
+    <!--  -->
+    <arg name="rviz" default="true" />
+    <!-- 如果使用RVIZ -->
+    <group if="$(arg rviz)">
+    <!-- 加载rviz的配置文件 -->
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find aloam_velodyne)/rviz_cfg/aloam_velodyne.rviz" />
+    </group>
+
+</launch>

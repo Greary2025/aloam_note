@@ -670,7 +670,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
     // 发布名字（从属的ID）
     // 没有发布的名称
-    laserCloudOutMsg.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // laserCloudOutMsg.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    laserCloudOutMsg.header.frame_id = "camera_init";
     // 发布
     // pubLaserCloud定义在main()中
     // 问题：为什么回调函数后面的变量，前面能调用
@@ -682,7 +685,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     //
     cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
     //
-    cornerPointsSharpMsg.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // cornerPointsSharpMsg.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    cornerPointsSharpMsg.header.frame_id = "camera_init";
     //
     pubCornerPointsSharp.publish(cornerPointsSharpMsg);
     // 次角点的发布
@@ -692,7 +698,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     //
     cornerPointsLessSharpMsg.header.stamp = laserCloudMsg->header.stamp;
     //
-    cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    cornerPointsLessSharpMsg.header.frame_id = "camera_init";
     //
     pubCornerPointsLessSharp.publish(cornerPointsLessSharpMsg);
     // 平面点的发布
@@ -702,7 +711,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     //
     surfPointsFlat2.header.stamp = laserCloudMsg->header.stamp;
     //
-    surfPointsFlat2.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // surfPointsFlat2.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    surfPointsFlat2.header.frame_id = "camera_init";
     //
     pubSurfPointsFlat.publish(surfPointsFlat2);
     // 次平面点的发布
@@ -712,7 +724,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     //
     surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
     //
-    surfPointsLessFlat2.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // surfPointsLessFlat2.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    surfPointsLessFlat2.header.frame_id = "camera_init";
     //
     pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
     // 如果发布每条线
@@ -729,7 +744,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             //
             scanMsg.header.stamp = laserCloudMsg->header.stamp;
             //
-            scanMsg.header.frame_id = "/camera_init";
+            // -------------ubuntu 18.04
+            // scanMsg.header.frame_id = "/camera_init";
+            // -------------ubuntu 20.04
+            scanMsg.header.frame_id = "camera_init";
             //
             pubEachScan[i].publish(scanMsg);
         }

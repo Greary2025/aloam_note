@@ -5,8 +5,11 @@ cmake_minimum_required(VERSION 2.8.3)
 project(aloam_velodyne)
 # 设置程序是运行版本
 set(CMAKE_BUILD_TYPE "Release")
-# 适用C++11标准
-set(CMAKE_CXX_FLAGS "-std=c++11")
+
+# ---------------适用C++11标准(ubuntu 18.04)
+# set(CMAKE_CXX_FLAGS "-std=c++11")
+# ---------------ubuntu20.04 的PCL库支持
+set(CMAKE_CXX_FLAGS "-std=c++14")
 # 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 # 查找调用库的路径（catkin编译需要的库）
@@ -40,8 +43,18 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(PCL REQUIRED)
 # OpenCV库
 find_package(OpenCV REQUIRED)
+# ---------------高版本的cv库，需配置路径
+# set(CMAKE_PREFIX_PATH "/usr/include/opencv4") 
+# find_package(OpenCV 4.0 QUIET)
 # Ceres库：非线性优化库
 find_package(Ceres REQUIRED)
+# ---------------高版本的cere库，需配置路径
+# 需要在CMakelists中指定运行的版本。
+# 这里需要找到你需要指定版本的CeresConfig.cmake文件所在的路径。
+# 也就是你安装时指定的路径下lib/cmake/Ceres中。
+# 在find_packeage前设置Ceres_DIR即可。
+# set(Ceres_DIR /usr/local/Ceres-2.1.0/lib/cmake/Ceres)
+# find_package(Ceres REQUIRED)
 
 # 包含C++库的路径
 include_directories(
@@ -62,6 +75,7 @@ catkin_package(
 )
 
 # 生成可执行文件ascanRegistration
+# 该程序统计点云数据
 add_executable(ascanRegistration src/scanRegistration.cpp)
 # 链接到PCL库
 target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})

@@ -1,40 +1,64 @@
 // Author:   Tong Qin               qintonguav@gmail.com
 // 	         Shaozu Cao 		    saozu.cao@connect.ust.hk
 
+// 主要桥接KITTI的数据集
+
 #include <iostream>
+// 文件打开关闭，C++文件流
 #include <fstream>
+//
 #include <iterator>
+//
 #include <string>
+//
 #include <vector>
+//
 #include <opencv2/opencv.hpp>
+// 图像转换，猜测：KITTI数据集有里程计，激光等信息，但多为图像信息
 #include <image_transport/image_transport.h>
+// HighGUI模块为高层GUI图形用户界面模块，包含媒体的输入输出、视频捕捉、图像和视频的编码解码、图形交互界面的接口等内容。
 #include <opencv2/highgui/highgui.hpp>
+//
 #include <nav_msgs/Odometry.h>
+//
 #include <nav_msgs/Path.h>
+//
 #include <ros/ros.h>
+//
 #include <rosbag/bag.h>
+//
 #include <geometry_msgs/PoseStamped.h>
+// 图像转接桥 把ROS图像转换成OpenCV图像
 #include <cv_bridge/cv_bridge.h>
+//
 #include <sensor_msgs/image_encodings.h>
+// 矩阵计算
 #include <eigen3/Eigen/Dense>
+//
 #include <pcl/point_cloud.h>
+//
 #include <pcl/point_types.h>
+// pcl转化
 #include <pcl_conversions/pcl_conversions.h>
+//
 #include <sensor_msgs/PointCloud2.h>
 
+// 返回浮点数组
+// 输入激光雷达数据路径
 std::vector<float> read_lidar_data(const std::string lidar_data_path)
 {
+    // 用文件流打开该路径的数据
     std::ifstream lidar_data_file(lidar_data_path, std::ifstream::in | std::ifstream::binary);
     lidar_data_file.seekg(0, std::ios::end);
     const size_t num_elements = lidar_data_file.tellg() / sizeof(float);
     lidar_data_file.seekg(0, std::ios::beg);
 
     std::vector<float> lidar_data_buffer(num_elements);
-    lidar_data_file.read(reinterpret_cast<char*>(&lidar_data_buffer[0]), num_elements*sizeof(float));
+    lidar_data_file.read(reinterpret_cast<char *>(&lidar_data_buffer[0]), num_elements * sizeof(float));
     return lidar_data_buffer;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     ros::init(argc, argv, "kitti_helper");
     ros::NodeHandle n("~");
@@ -56,14 +80,20 @@ int main(int argc, char** argv)
     image_transport::Publisher pub_image_left = it.advertise("/image_left", 2);
     image_transport::Publisher pub_image_right = it.advertise("/image_right", 2);
 
-    ros::Publisher pubOdomGT = n.advertise<nav_msgs::Odometry> ("/odometry_gt", 5);
+    ros::Publisher pubOdomGT = n.advertise<nav_msgs::Odometry>("/odometry_gt", 5);
     nav_msgs::Odometry odomGT;
-    odomGT.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // odomGT.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    odomGT.header.frame_id = "camera_init";
     odomGT.child_frame_id = "/ground_truth";
 
-    ros::Publisher pubPathGT = n.advertise<nav_msgs::Path> ("/path_gt", 5);
+    ros::Publisher pubPathGT = n.advertise<nav_msgs::Path>("/path_gt", 5);
     nav_msgs::Path pathGT;
-    pathGT.header.frame_id = "/camera_init";
+    // -------------ubuntu 18.04
+    // pathGT.header.frame_id = "/camera_init";
+    // -------------ubuntu 20.04
+    pathGT.header.frame_id = "camera_init";
 
     std::string timestamp_path = "sequences/" + sequence_number + "/times.txt";
     std::ifstream timestamp_file(dataset_folder + timestamp_path, std::ifstream::in);
@@ -74,7 +104,7 @@ int main(int argc, char** argv)
     rosbag::Bag bag_out;
     if (to_bag)
         bag_out.open(output_bag_file, rosbag::bagmode::Write);
-    
+
     Eigen::Matrix3d R_transform;
     R_transform << 0, 0, 1, -1, 0, 0, 0, -1, 0;
     Eigen::Quaterniond q_transform(R_transform);
@@ -129,7 +159,7 @@ int main(int argc, char** argv)
 
         // read lidar point cloud
         std::stringstream lidar_data_path;
-        lidar_data_path << dataset_folder << "velodyne/sequences/" + sequence_number + "/velodyne/" 
+        lidar_data_path << dataset_folder << "velodyne/sequences/" + sequence_number + "/velodyne/"
                         << std::setfill('0') << std::setw(6) << line_num << ".bin";
         std::vector<float> lidar_data = read_lidar_data(lidar_data_path.str());
         std::cout << "totally " << lidar_data.size() / 4.0 << " points in this lidar frame \n";
@@ -139,8 +169,8 @@ int main(int argc, char** argv)
         pcl::PointCloud<pcl::PointXYZI> laser_cloud;
         for (std::size_t i = 0; i < lidar_data.size(); i += 4)
         {
-            lidar_points.emplace_back(lidar_data[i], lidar_data[i+1], lidar_data[i+2]);
-            lidar_intensities.push_back(lidar_data[i+3]);
+            lidar_points.emplace_back(lidar_data[i], lidar_data[i + 1], lidar_data[i + 2]);
+            lidar_intensities.push_back(lidar_data[i + 3]);
 
             pcl::PointXYZI point;
             point.x = lidar_data[i];
@@ -153,7 +183,10 @@ int main(int argc, char** argv)
         sensor_msgs::PointCloud2 laser_cloud_msg;
         pcl::toROSMsg(laser_cloud, laser_cloud_msg);
         laser_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
-        laser_cloud_msg.header.frame_id = "/camera_init";
+        // -------------ubuntu 18.04
+        // laser_cloud_msg.header.frame_id = "/camera_init";
+        // -------------ubuntu 20.04
+        laser_cloud_msg.header.frame_id = "camera_init";
         pub_laser_cloud.publish(laser_cloud_msg);
 
         sensor_msgs::ImagePtr image_left_msg = cv_bridge::CvImage(laser_cloud_msg.header, "mono8", left_image).toImageMsg();
@@ -170,12 +203,11 @@ int main(int argc, char** argv)
             bag_out.write("/odometry_gt", ros::Time::now(), odomGT);
         }
 
-        line_num ++;
+        line_num++;
         r.sleep();
     }
     bag_out.close();
     std::cout << "Done \n";
-
 
     return 0;
 }
