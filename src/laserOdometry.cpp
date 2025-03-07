@@ -684,10 +684,23 @@ int main(int argc, char **argv)
             laserCloudCornerLastNum = laserCloudCornerLast->points.size();
             laserCloudSurfLastNum = laserCloudSurfLast->points.size();
 
-            // std::cout << "the size of corner last is " << laserCloudCornerLastNum << ", and the size of surf last is " << laserCloudSurfLastNum << '\n';
+            std::cout << "the size of corner last is " << laserCloudCornerLastNum << ", and the size of surf last is " << laserCloudSurfLastNum << '\n';
 
-            kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
-            kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
+            // 空点云的处理方法
+            if (!laserCloudCornerLast->empty())
+            {
+                /* code */
+                kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
+            }
+            // 空点云的处理方法
+            if (!laserCloudSurfLast->empty())
+            {
+                /* code */
+                kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
+            }
+            
+            // kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
+            // kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
 
             if (frameCount % skipFrameNum == 0)
             {

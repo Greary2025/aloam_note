@@ -47,14 +47,19 @@ find_package(OpenCV REQUIRED)
 # set(CMAKE_PREFIX_PATH "/usr/include/opencv4") 
 # find_package(OpenCV 4.0 QUIET)
 # Ceres库：非线性优化库
-find_package(Ceres REQUIRED)
+# find_package(Ceres REQUIRED)
 # ---------------高版本的cere库，需配置路径
 # 需要在CMakelists中指定运行的版本。
 # 这里需要找到你需要指定版本的CeresConfig.cmake文件所在的路径。
 # 也就是你安装时指定的路径下lib/cmake/Ceres中。
 # 在find_packeage前设置Ceres_DIR即可。
 # set(Ceres_DIR /usr/local/Ceres-2.1.0/lib/cmake/Ceres)
-# find_package(Ceres REQUIRED)
+find_package(Ceres REQUIRED)
+# 由于Ceres库连着glog库和gflags库，所以需要在find_package前设置
+# set(GLOG_INCLUDE_DIRS /usr/include/glog)
+find_package(glog REQUIRED)
+# set(GFLAGS_INCLUDE_DIRS /usr/include/gflags)
+find_package(gflags REQUIRED)
 
 # 包含C++库的路径
 include_directories(
@@ -66,7 +71,12 @@ include_directories(
   # Ceres库
   ${CERES_INCLUDE_DIRS}
   # opencv库
-  ${OpenCV_INCLUDE_DIRS})
+  ${OpenCV_INCLUDE_DIRS}
+  # glog库
+  ${GLOG_INCLUDE_DIRS}
+  # gflags库
+  ${GFLAGS_INCLUDE_DIRS}
+  )
 # 编译的包
 catkin_package(
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs
@@ -78,16 +88,35 @@ catkin_package(
 # 该程序统计点云数据
 add_executable(ascanRegistration src/scanRegistration.cpp)
 # 链接到PCL库
-target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(ascanRegistration 
+  ${catkin_LIBRARIES} 
+  ${PCL_LIBRARIES}
+  )
 
 add_executable(alaserOdometry src/laserOdometry.cpp)
-target_link_libraries(alaserOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
+target_link_libraries(alaserOdometry 
+  ${catkin_LIBRARIES} 
+  ${PCL_LIBRARIES} 
+  ${CERES_LIBRARIES}
+  ${GLOG_LIBRARIES}
+  ${GFLAGS_LIBRARIES}
+  )
 
 add_executable(alaserMapping src/laserMapping.cpp)
-target_link_libraries(alaserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
+target_link_libraries(alaserMapping 
+  ${catkin_LIBRARIES} 
+  ${PCL_LIBRARIES} 
+  ${CERES_LIBRARIES}
+  ${GLOG_LIBRARIES}
+  ${GFLAGS_LIBRARIES}
+  )
 
 add_executable(kittiHelper src/kittiHelper.cpp)
-target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(kittiHelper 
+  ${catkin_LIBRARIES} 
+  ${PCL_LIBRARIES} 
+  ${OpenCV_LIBS}
+  )
 
 
 
