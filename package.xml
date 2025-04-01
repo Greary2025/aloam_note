@@ -44,6 +44,8 @@
   <build_depend>tf</build_depend>
   <!-- 图像转换，ros点云和PCL点云之间的转换 -->
   <build_depend>image_transport</build_depend>
+  <!-- 添加 glog 库的构建依赖 -->
+  <build_depend>glog</build_depend>
   
   <!-- build_export_depend:构建导出依赖关系，如果功能包导出头文件，则其他包可能需要这个包，就应该使用这个标签，用来传递声明。 -->
 
@@ -62,8 +64,11 @@
   <run_depend>rosbag</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>image_transport</run_depend>
+  <!-- 添加 glog 库的运行依赖 -->
+  <run_depend>glog</run_depend>
 
 <!-- 元包是一个普通打的包 -->
   <export>
+    <!-- 这里可以添加元包相关信息 -->
   </export>
 </package>

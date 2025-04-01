@@ -1,18 +1,22 @@
-# cmake最低版本
+# 设置 CMake 最低版本要求
 cmake_minimum_required(VERSION 2.8.3)
 # 项目名称aloam_velodyne
 # 使用roslaunch查找时，也是这个项目名称
 project(aloam_velodyne)
-# 设置程序是运行版本
+
+# 设置构建类型为 Release
 set(CMAKE_BUILD_TYPE "Release")
 
 # ---------------适用C++11标准(ubuntu 18.04)
 # set(CMAKE_CXX_FLAGS "-std=c++11")
 # ---------------ubuntu20.04 的PCL库支持
 set(CMAKE_CXX_FLAGS "-std=c++14")
-# 
+# 设置运行时库搜索路径
+# set(CMAKE_INSTALL_RPATH "/usr/lib/x86_64-linux-gnu")
+
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
-# 查找调用库的路径（catkin编译需要的库）
+
+# 查找 catkin 依赖的 ROS 包
 find_package(catkin REQUIRED COMPONENTS
 # 位姿信息库
   geometry_msgs
@@ -47,19 +51,16 @@ find_package(OpenCV REQUIRED)
 # set(CMAKE_PREFIX_PATH "/usr/include/opencv4") 
 # find_package(OpenCV 4.0 QUIET)
 # Ceres库：非线性优化库
-# find_package(Ceres REQUIRED)
+find_package(Ceres REQUIRED)
 # ---------------高版本的cere库，需配置路径
 # 需要在CMakelists中指定运行的版本。
 # 这里需要找到你需要指定版本的CeresConfig.cmake文件所在的路径。
 # 也就是你安装时指定的路径下lib/cmake/Ceres中。
 # 在find_packeage前设置Ceres_DIR即可。
 # set(Ceres_DIR /usr/local/Ceres-2.1.0/lib/cmake/Ceres)
-find_package(Ceres REQUIRED)
-# 由于Ceres库连着glog库和gflags库，所以需要在find_package前设置
-# set(GLOG_INCLUDE_DIRS /usr/include/glog)
+# find_package(Ceres REQUIRED)
+# 查找 glog 库
 find_package(glog REQUIRED)
-# set(GFLAGS_INCLUDE_DIRS /usr/include/gflags)
-find_package(gflags REQUIRED)
 
 # 包含C++库的路径
 include_directories(
@@ -74,8 +75,9 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
   # glog库
   ${GLOG_INCLUDE_DIRS}
+  # ${glog_INCLUDE_DIRS}
   # gflags库
-  ${GFLAGS_INCLUDE_DIRS}
+  # ${GFLAGS_INCLUDE_DIRS}
   )
 # 编译的包
 catkin_package(
@@ -99,7 +101,6 @@ target_link_libraries(alaserOdometry
   ${PCL_LIBRARIES} 
   ${CERES_LIBRARIES}
   ${GLOG_LIBRARIES}
-  ${GFLAGS_LIBRARIES}
   )
 
 add_executable(alaserMapping src/laserMapping.cpp)
@@ -108,7 +109,6 @@ target_link_libraries(alaserMapping
   ${PCL_LIBRARIES} 
   ${CERES_LIBRARIES}
   ${GLOG_LIBRARIES}
-  ${GFLAGS_LIBRARIES}
   )
 
 add_executable(kittiHelper src/kittiHelper.cpp)

@@ -313,9 +313,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
         // 这是32线的情况
         else if (N_SCANS == 32)
         {
-            //
+            //int直接截断，取整
             scanID = int((angle + 92.0 / 3.0) * 3.0 / 4.0);
-            //
+            // 10.66  |  9.33  |  8.00  |  6.66  |  5.33  |  4.00  |  2.66  |  1.33  |  0.00  |。。。
+            //   31   |   30   |   29   |   28   |   27   |   26   |   25   |   24   |   23   |。。。
             if (scanID > (N_SCANS - 1) || scanID < 0)
             {
                 count--;

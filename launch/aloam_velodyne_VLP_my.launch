@@ -28,7 +28,7 @@
 
     <node pkg="rosbag" type="play" name="rosbag_player"
     args="--clock --rate=1 
-    $(env HOME)/rosbag_list/uploader/uplodaer_VLP16_01.bag"
+    $(env HOME)/rosbag/uplodaer_VLP16_01.bag"
     />
 
 </launch>
