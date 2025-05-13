@@ -60,7 +60,8 @@ find_package(Ceres REQUIRED)
 # set(Ceres_DIR /usr/local/Ceres-2.1.0/lib/cmake/Ceres)
 # find_package(Ceres REQUIRED)
 # 查找 glog 库
-find_package(glog REQUIRED)
+# list(APPEND CMAKE_PREFIX_PATH "/usr/local")  # 若Glog安装在/usr/local下
+# find_package(glog REQUIRED)
 
 # 包含C++库的路径
 include_directories(
@@ -74,7 +75,7 @@ include_directories(
   # opencv库
   ${OpenCV_INCLUDE_DIRS}
   # glog库
-  ${GLOG_INCLUDE_DIRS}
+  # ${GLOG_INCLUDE_DIRS}
   # ${glog_INCLUDE_DIRS}
   # gflags库
   # ${GFLAGS_INCLUDE_DIRS}
@@ -100,7 +101,9 @@ target_link_libraries(alaserOdometry
   ${catkin_LIBRARIES} 
   ${PCL_LIBRARIES} 
   ${CERES_LIBRARIES}
-  ${GLOG_LIBRARIES}
+  # ${GLOG_LIBRARIES}
+  # ${glog_INCLUDE_DIRS}
+  # glog::glog
   )
 
 add_executable(alaserMapping src/laserMapping.cpp)
@@ -108,7 +111,9 @@ target_link_libraries(alaserMapping
   ${catkin_LIBRARIES} 
   ${PCL_LIBRARIES} 
   ${CERES_LIBRARIES}
-  ${GLOG_LIBRARIES}
+  # ${GLOG_LIBRARIES}
+  # ${glog_INCLUDE_DIRS}
+  # glog::glog
   )
 
 add_executable(kittiHelper src/kittiHelper.cpp)

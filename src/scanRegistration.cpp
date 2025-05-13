@@ -791,9 +791,9 @@ int main(int argc, char **argv)
     // laserCloudHandler并没有直接进入，在ros::spin()触发后才开始回调
     // 所以下面是发布函数的定义，但是回调函数中已经开始使用了
     // 开始运行函数时并没有调用laserCloudHandler，下面对发布者进行定义，当运行到ros::spin()时，进入消息队列，处理laserCloudHandler，才开始发布
-    // ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(rostopicname, 100, laserCloudHandler);
+    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(rostopicname, 100, laserCloudHandler);
     // ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/2Multivelodyne_points", 100, laserCloudHandler);
-    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/xcjtcplidar", 100, laserCloudHandler);
+    // ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/xcjtcplidar", 100, laserCloudHandler);
     // 发布对象pubLaserCloud，发布点云数据，话题名/velodyne_cloud_2
     // 其实laserCloudHandler已经发布
     pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
