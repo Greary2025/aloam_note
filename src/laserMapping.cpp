@@ -35,195 +35,207 @@
 // POSSIBILITY OF SUCH DAMAGE.
 // 数学函数库
 #include <math.h>
-// 
+// C++动态数组容器（用于存储点云等动态数据）
 #include <vector>
-// 
+// LOAM通用头文件（包含点类型定义、宏定义等）
 #include <aloam_velodyne/common.h>
-// 
+// ROS导航消息（用于发布里程计信息）
 #include <nav_msgs/Odometry.h>
-//里程计信息
+// ROS路径消息（用于发布轨迹路径）
 #include <nav_msgs/Path.h>
-//路径信息
+// ROS带时间戳的位姿消息（用于路径存储）
 #include <geometry_msgs/PoseStamped.h>
-// 
+// PCL与ROS点云转换库（点云消息格式转换）
 #include <pcl_conversions/pcl_conversions.h>
-// 
+// PCL点云数据结构（点云类定义）
 #include <pcl/point_cloud.h>
-// 
+// PCL点类型定义（如PointType点结构）
 #include <pcl/point_types.h>
-// voxel_grid，降采样函数
+// PCL体素滤波（用于点云降采样）
 #include <pcl/filters/voxel_grid.h>
-// 
+// PCL KD树（用于最近邻搜索）
 #include <pcl/kdtree/kdtree_flann.h>
-// 
+// ROS核心库（节点初始化、消息循环等）
 #include <ros/ros.h>
 // IMU数据的通用函数库
 // sensor_msgs库中包含很多传感器库
 #include <sensor_msgs/Imu.h>
-// 
+// ROS点云消息（接收/发布点云数据）
 #include <sensor_msgs/PointCloud2.h>
-// 
+// ROS TF变换（坐标变换广播与解析）
 #include <tf/transform_datatypes.h>
 // 
 #include <tf/transform_broadcaster.h>
-// 
+// Eigen矩阵运算库（位姿变换计算）
 #include <eigen3/Eigen/Dense>
-// 
+// Ceres优化库（用于位姿优化）
 #include <ceres/ceres.h>
-// C++，互斥量（C++线程的概念）
+// C++互斥锁（线程安全的数据访问）
 #include <mutex>
-// 队列，C++中还有#include <stack>堆栈
+// C++队列（缓存传感器数据）
 #include <queue>
-// C++多线程
+// C++多线程（本文件可能用于后台处理）
 #include <thread>
-// C++输入输出
+// C++输入输出（控制台日志）
 #include <iostream>
-// C++字符串
+// C++字符串（路径处理、消息字段）
 #include <string>
 
+// LOAM自定义因子（点到线/面的残差计算）
 #include "lidarFactor.hpp"
+// LOAM通用头文件（重复包含，可能为确保完整性）
 #include "aloam_velodyne/common.h"
+// 时间统计工具（计算函数耗时）
 #include "aloam_velodyne/tic_toc.h"
 
-
+// 全局变量：帧计数（控制发布频率等）
 int frameCount = 0;
+// 全局变量：各点云消息的时间戳（用于数据同步）
+double timeLaserCloudCornerLast = 0;  // 上一帧角点时间戳
+double timeLaserCloudSurfLast = 0;    // 上一帧平面点时间戳
+double timeLaserCloudFullRes = 0;     // 全分辨率点云时间戳
+double timeLaserOdometry = 0;         // 里程计时间戳
 
-double timeLaserCloudCornerLast = 0;
-double timeLaserCloudSurfLast = 0;
-double timeLaserCloudFullRes = 0;
-double timeLaserOdometry = 0;
+// 地图分块参数（管理局部地图的空间划分）
+int laserCloudCenWidth = 10;   // 当前位姿在X轴方向的分块中心索引
+int laserCloudCenHeight = 10;  // 当前位姿在Y轴方向的分块中心索引
+int laserCloudCenDepth = 5;    // 当前位姿在Z轴方向的分块中心索引
+const int laserCloudWidth = 21;    // X轴方向总分块数（奇数保证中心对称）
+const int laserCloudHeight = 21;   // Y轴方向总分块数
+const int laserCloudDepth = 11;    // Z轴方向总分块数
 
+// 全局数组：有效分块索引（用于当前建图的局部区域）、周围分块索引（用于可视化）
+const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth; // 总分块数（21*21*11=4851）
+int laserCloudValidInd[125];       // 有效分块索引数组（最大125个，5x5x5）
+int laserCloudSurroundInd[125];    // 周围分块索引数组（与有效分块可能重叠）
 
-int laserCloudCenWidth = 10;
-int laserCloudCenHeight = 10;
-int laserCloudCenDepth = 5;
-const int laserCloudWidth = 21;
-const int laserCloudHeight = 21;
-const int laserCloudDepth = 11;
-
-
-const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth; //4851
-
-
-int laserCloudValidInd[125];
-int laserCloudSurroundInd[125];
-
-// input: from odom
+// 输入点云（来自里程计模块）：上一帧角点、平面点
 pcl::PointCloud<PointType>::Ptr laserCloudCornerLast(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudSurfLast(new pcl::PointCloud<PointType>());
 
-// ouput: all visualble cube points
+// 输出点云：周围可见分块的所有点（用于发布）
 pcl::PointCloud<PointType>::Ptr laserCloudSurround(new pcl::PointCloud<PointType>());
 
-// surround points in map to build tree
+// 地图点云：从地图分块中提取的角点、平面点（用于构建KD树）
 pcl::PointCloud<PointType>::Ptr laserCloudCornerFromMap(new pcl::PointCloud<PointType>());
 pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMap(new pcl::PointCloud<PointType>());
 
-//input & output: points in one frame. local --> global
+// 输入/输出点云：当前帧全分辨率点云（局部坐标转全局坐标后输出）
 pcl::PointCloud<PointType>::Ptr laserCloudFullRes(new pcl::PointCloud<PointType>());
 
-// points in every cube
+// 分块点云存储：每个分块的角点、平面点云（按三维索引存储）
 pcl::PointCloud<PointType>::Ptr laserCloudCornerArray[laserCloudNum];
 pcl::PointCloud<PointType>::Ptr laserCloudSurfArray[laserCloudNum];
 
-//kd-tree
+// KD树：用于地图点云的最近邻搜索（角点、平面点分别建图）
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap(new pcl::KdTreeFLANN<PointType>());
 pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap(new pcl::KdTreeFLANN<PointType>());
+// 位姿参数：存储当前位姿（四元数+平移向量，用于Ceres优化）
+double parameters[7] = {0, 0, 0, 1, 0, 0, 0};  // [qx, qy, qz, qw, tx, ty, tz]
+Eigen::Map<Eigen::Quaterniond> q_w_curr(parameters);  // 四元数映射（前4位）
+Eigen::Map<Eigen::Vector3d> t_w_curr(parameters + 4);  // 平移向量映射（后3位）
 
-double parameters[7] = {0, 0, 0, 1, 0, 0, 0};
-Eigen::Map<Eigen::Quaterniond> q_w_curr(parameters);
-Eigen::Map<Eigen::Vector3d> t_w_curr(parameters + 4);
+// 坐标系变换：里程计坐标系到地图坐标系的变换（用于全局位姿转换）
+// wmap_T_odom * odom_T_curr = wmap_T_curr（地图坐标系下的当前位姿）
+Eigen::Quaterniond q_wmap_wodom(1, 0, 0, 0);  // 旋转四元数（初始为单位四元数）
+Eigen::Vector3d t_wmap_wodom(0, 0, 0);         // 平移向量（初始为原点）
 
-// wmap_T_odom * odom_T_curr = wmap_T_curr;
-// transformation between odom's world and map's world frame
-Eigen::Quaterniond q_wmap_wodom(1, 0, 0, 0);
-Eigen::Vector3d t_wmap_wodom(0, 0, 0);
+// 里程计位姿：当前帧在里程计坐标系下的位姿（来自激光里程计模块）
+Eigen::Quaterniond q_wodom_curr(1, 0, 0, 0);   // 旋转四元数
+Eigen::Vector3d t_wodom_curr(0, 0, 0);          // 平移向量
 
-Eigen::Quaterniond q_wodom_curr(1, 0, 0, 0);
-Eigen::Vector3d t_wodom_curr(0, 0, 0);
+// 数据队列（缓存传感器消息，用于同步处理）
+std::queue<sensor_msgs::PointCloud2ConstPtr> cornerLastBuf;  // 角点云队列
+std::queue<sensor_msgs::PointCloud2ConstPtr> surfLastBuf;    // 平面点云队列
+std::queue<sensor_msgs::PointCloud2ConstPtr> fullResBuf;     // 全分辨率点云队列
+std::queue<nav_msgs::Odometry::ConstPtr> odometryBuf;        // 里程计消息队列
+std::mutex mBuf;  // 互斥锁（保证队列操作的线程安全）
 
+// 点云降采样滤波器（减少点云密度，提升计算效率）
+pcl::VoxelGrid<PointType> downSizeFilterCorner;  // 角点降采样滤波器
+pcl::VoxelGrid<PointType> downSizeFilterSurf;    // 平面点降采样滤波器
 
-std::queue<sensor_msgs::PointCloud2ConstPtr> cornerLastBuf;
-std::queue<sensor_msgs::PointCloud2ConstPtr> surfLastBuf;
-std::queue<sensor_msgs::PointCloud2ConstPtr> fullResBuf;
-std::queue<nav_msgs::Odometry::ConstPtr> odometryBuf;
-std::mutex mBuf;
-
-pcl::VoxelGrid<PointType> downSizeFilterCorner;
-pcl::VoxelGrid<PointType> downSizeFilterSurf;
-
+// KD树搜索结果：存储最近邻点的索引和距离平方（全局变量避免重复分配内存）
 std::vector<int> pointSearchInd;
 std::vector<float> pointSearchSqDis;
-
+// 临时点变量：用于坐标变换时的中间存储（当前点、筛选点）
 PointType pointOri, pointSel;
-
+// ROS发布者：发布建图结果（周围点云、地图点云、全分辨率点云、优化后里程计、路径）
 ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath;
-
+// 路径消息：存储建图后的轨迹（用于可视化）
 nav_msgs::Path laserAfterMappedPath;
 
-// set initial guess
+// 函数声明：将里程计位姿转换为地图坐标系位姿（设置初始优化值）
 void transformAssociateToMap()
 {
-	q_w_curr = q_wmap_wodom * q_wodom_curr;
-	t_w_curr = q_wmap_wodom * t_wodom_curr + t_wmap_wodom;
+	// 地图坐标系下的当前位姿 = 地图到里程计变换 * 里程计坐标系下的当前位姿
+    q_w_curr = q_wmap_wodom * q_wodom_curr;  // 四元数乘法（旋转组合）
+    t_w_curr = q_wmap_wodom * t_wodom_curr + t_wmap_wodom;  // 平移变换（先旋转再平移）
 }
-
+// 函数声明：更新地图到里程计的变换（优化后更新全局变换）
 void transformUpdate()
 {
-	q_wmap_wodom = q_w_curr * q_wodom_curr.inverse();
-	t_wmap_wodom = t_w_curr - q_wmap_wodom * t_wodom_curr;
+	// 地图到里程计的旋转 = 地图到当前的旋转 * 当前到里程计的旋转逆
+    q_wmap_wodom = q_w_curr * q_wodom_curr.inverse();
+    // 地图到里程计的平移 = 地图到当前的平移 - 地图到里程计的旋转 * 里程计到当前的平移
+    t_wmap_wodom = t_w_curr - q_wmap_wodom * t_wodom_curr;
 }
-
+// 函数声明：将点从当前坐标系转换到地图坐标系
 void pointAssociateToMap(PointType const *const pi, PointType *const po)
 {
-	Eigen::Vector3d point_curr(pi->x, pi->y, pi->z);
-	Eigen::Vector3d point_w = q_w_curr * point_curr + t_w_curr;
-	po->x = point_w.x();
-	po->y = point_w.y();
-	po->z = point_w.z();
-	po->intensity = pi->intensity;
+	// 当前点坐标（当前坐标系）
+    Eigen::Vector3d point_curr(pi->x, pi->y, pi->z);
+    // 转换到地图坐标系（地图位姿变换）
+    Eigen::Vector3d point_w = q_w_curr * point_curr + t_w_curr;
+    // 输出转换后的点坐标（保留强度值）
+    po->x = point_w.x();
+    po->y = point_w.y();
+    po->z = point_w.z();
+    po->intensity = pi->intensity;
 	//po->intensity = 1.0;
 }
-
+// 函数声明：将点从地图坐标系转换到当前坐标系（反向变换）
 void pointAssociateTobeMapped(PointType const *const pi, PointType *const po)
 {
-	Eigen::Vector3d point_w(pi->x, pi->y, pi->z);
-	Eigen::Vector3d point_curr = q_w_curr.inverse() * (point_w - t_w_curr);
-	po->x = point_curr.x();
-	po->y = point_curr.y();
-	po->z = point_curr.z();
-	po->intensity = pi->intensity;
+	// 地图点坐标（地图坐标系）
+    Eigen::Vector3d point_w(pi->x, pi->y, pi->z);
+    // 转换到当前坐标系（位姿逆变换）
+    Eigen::Vector3d point_curr = q_w_curr.inverse() * (point_w - t_w_curr);
+    // 输出转换后的点坐标（保留强度值）
+    po->x = point_curr.x();
+    po->y = point_curr.y();
+    po->z = point_curr.z();
+    po->intensity = pi->intensity;
 }
-
+// 回调函数：接收角点云消息并缓存到队列
 void laserCloudCornerLastHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudCornerLast2)
 {
-	mBuf.lock();
-	cornerLastBuf.push(laserCloudCornerLast2);
-	mBuf.unlock();
+	mBuf.lock();          // 加锁防止多线程竞争
+    cornerLastBuf.push(laserCloudCornerLast2);  // 将消息压入队列
+    mBuf.unlock();        // 解锁释放资源
 }
-
+// 回调函数：接收平面点云消息并缓存到队列
 void laserCloudSurfLastHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudSurfLast2)
 {
 	mBuf.lock();
 	surfLastBuf.push(laserCloudSurfLast2);
 	mBuf.unlock();
 }
-
+// 回调函数：接收全分辨率点云消息并缓存到队列
 void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudFullRes2)
 {
 	mBuf.lock();
 	fullResBuf.push(laserCloudFullRes2);
 	mBuf.unlock();
 }
-
-//receive odomtry
+// 回调函数：接收里程计消息并缓存到队列（同时发布高频优化后里程计）
 void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr &laserOdometry)
 {
 	mBuf.lock();
 	odometryBuf.push(laserOdometry);
 	mBuf.unlock();
 
-	// high frequence publish
+	// 提取里程计位姿（里程计坐标系下的当前位姿）
 	Eigen::Quaterniond q_wodom_curr;
 	Eigen::Vector3d t_wodom_curr;
 	q_wodom_curr.x() = laserOdometry->pose.pose.orientation.x;
@@ -233,86 +245,91 @@ void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr &laserOdometry)
 	t_wodom_curr.x() = laserOdometry->pose.pose.position.x;
 	t_wodom_curr.y() = laserOdometry->pose.pose.position.y;
 	t_wodom_curr.z() = laserOdometry->pose.pose.position.z;
-
+	// 转换为地图坐标系下的位姿（使用当前地图到里程计的变换）
 	Eigen::Quaterniond q_w_curr = q_wmap_wodom * q_wodom_curr;
 	Eigen::Vector3d t_w_curr = q_wmap_wodom * t_wodom_curr + t_wmap_wodom; 
-
+	// 构建并发布高频优化后里程计消息
 	nav_msgs::Odometry odomAftMapped;
 	// -------------ubuntu 18.04
 	// odomAftMapped.header.frame_id = "/camera_init";
 	// -------------ubuntu 20.04
-	odomAftMapped.header.frame_id = "camera_init";
-	odomAftMapped.child_frame_id = "/aft_mapped";
-	odomAftMapped.header.stamp = laserOdometry->header.stamp;
+	odomAftMapped.header.frame_id = "camera_init";	// 父坐标系（初始相机坐标系）
+	odomAftMapped.child_frame_id = "/aft_mapped";	// 子坐标系（建图后坐标系）
+	odomAftMapped.header.stamp = laserOdometry->header.stamp;	// 
+	// odomAftMapped.pose.pose.orientation = laserOdometry->pose.pose.orientation;	// 位姿数据
 	odomAftMapped.pose.pose.orientation.x = q_w_curr.x();
 	odomAftMapped.pose.pose.orientation.y = q_w_curr.y();
 	odomAftMapped.pose.pose.orientation.z = q_w_curr.z();
 	odomAftMapped.pose.pose.orientation.w = q_w_curr.w();
+	// odomAftMapped.pose.pose.position = laserOdometry->pose.pose.position;
 	odomAftMapped.pose.pose.position.x = t_w_curr.x();
 	odomAftMapped.pose.pose.position.y = t_w_curr.y();
 	odomAftMapped.pose.pose.position.z = t_w_curr.z();
-	pubOdomAftMappedHighFrec.publish(odomAftMapped);
+	pubOdomAftMappedHighFrec.publish(odomAftMapped);	// 发布高频消息
 }
-
+// 核心处理函数：从队列取出同步数据，执行建图与位姿优化
 void process()
 {
-	while(1)
+	while(1)	// 无限循环处理数据
 	{
+		// 当所有数据队列（角点、平面点、全分辨率点云、里程计）均有数据时进入处理流程
 		while (!cornerLastBuf.empty() && !surfLastBuf.empty() &&
 			!fullResBuf.empty() && !odometryBuf.empty())
 		{
-			mBuf.lock();
+			mBuf.lock();	// 加锁保证队列操作线程安全
+			// 同步里程计数据时间戳（丢弃早于角点数据时间戳的里程计消息）
 			while (!odometryBuf.empty() && odometryBuf.front()->header.stamp.toSec() < cornerLastBuf.front()->header.stamp.toSec())
 				odometryBuf.pop();
-			if (odometryBuf.empty())
+			if (odometryBuf.empty())	// 若里程计队列为空，解锁并跳出循环
 			{
 				mBuf.unlock();
 				break;
 			}
-
+			// 同步平面点数据时间戳（丢弃早于角点数据时间戳的平面点消息）
 			while (!surfLastBuf.empty() && surfLastBuf.front()->header.stamp.toSec() < cornerLastBuf.front()->header.stamp.toSec())
 				surfLastBuf.pop();
-			if (surfLastBuf.empty())
+			if (surfLastBuf.empty())	// 若平面点队列为空，解锁并跳出循环
 			{
 				mBuf.unlock();
 				break;
 			}
-
+			// 同步全分辨率点云时间戳（丢弃早于角点数据时间戳的全分辨率点云消息）
 			while (!fullResBuf.empty() && fullResBuf.front()->header.stamp.toSec() < cornerLastBuf.front()->header.stamp.toSec())
 				fullResBuf.pop();
-			if (fullResBuf.empty())
+			if (fullResBuf.empty())		// 若全分辨率点云队列为空，解锁并跳出循环
 			{
 				mBuf.unlock();
 				break;
 			}
-
+			// 提取各数据的时间戳
 			timeLaserCloudCornerLast = cornerLastBuf.front()->header.stamp.toSec();
 			timeLaserCloudSurfLast = surfLastBuf.front()->header.stamp.toSec();
 			timeLaserCloudFullRes = fullResBuf.front()->header.stamp.toSec();
 			timeLaserOdometry = odometryBuf.front()->header.stamp.toSec();
-
+			// 检查时间戳是否同步（所有数据时间戳必须一致）
 			if (timeLaserCloudCornerLast != timeLaserOdometry ||
 				timeLaserCloudSurfLast != timeLaserOdometry ||
 				timeLaserCloudFullRes != timeLaserOdometry)
 			{
+				// 打印时间戳信息并提示不同步，解锁并跳出循环
 				printf("time corner %f surf %f full %f odom %f \n", timeLaserCloudCornerLast, timeLaserCloudSurfLast, timeLaserCloudFullRes, timeLaserOdometry);
 				printf("unsync messeage!");
 				mBuf.unlock();
 				break;
 			}
-
+			// 从队列中取出角点云数据并转换为PCL点云格式
 			laserCloudCornerLast->clear();
 			pcl::fromROSMsg(*cornerLastBuf.front(), *laserCloudCornerLast);
 			cornerLastBuf.pop();
-
+			// 从队列中取出平面点云数据并转换为PCL点云格式
 			laserCloudSurfLast->clear();
 			pcl::fromROSMsg(*surfLastBuf.front(), *laserCloudSurfLast);
 			surfLastBuf.pop();
-
+			// 从队列中取出全分辨率点云数据并转换为PCL点云格式
 			laserCloudFullRes->clear();
 			pcl::fromROSMsg(*fullResBuf.front(), *laserCloudFullRes);
 			fullResBuf.pop();
-
+			// 从队列中取出里程计数据并更新当前里程计位姿
 			q_wodom_curr.x() = odometryBuf.front()->pose.pose.orientation.x;
 			q_wodom_curr.y() = odometryBuf.front()->pose.pose.orientation.y;
 			q_wodom_curr.z() = odometryBuf.front()->pose.pose.orientation.z;
@@ -321,49 +338,53 @@ void process()
 			t_wodom_curr.y() = odometryBuf.front()->pose.pose.position.y;
 			t_wodom_curr.z() = odometryBuf.front()->pose.pose.position.z;
 			odometryBuf.pop();
-
+			// 丢弃队列中剩余的角点数据（保证实时性，避免累积）
 			while(!cornerLastBuf.empty())
 			{
 				cornerLastBuf.pop();
 				printf("drop lidar frame in mapping for real time performance \n");
 			}
 
-			mBuf.unlock();
+			mBuf.unlock();		// 解锁释放资源
 
-			TicToc t_whole;
+			TicToc t_whole;		// 统计整体处理耗时
 
-			transformAssociateToMap();
+			transformAssociateToMap();	// 将里程计位姿转换为地图坐标系位姿（设置初始优化值）
 
-			TicToc t_shift;
+			TicToc t_shift;		// 统计地图分块调整耗时
+            // 计算当前位姿所在的地图分块中心索引（X/Y/Z方向）
 			int centerCubeI = int((t_w_curr.x() + 25.0) / 50.0) + laserCloudCenWidth;
 			int centerCubeJ = int((t_w_curr.y() + 25.0) / 50.0) + laserCloudCenHeight;
 			int centerCubeK = int((t_w_curr.z() + 25.0) / 50.0) + laserCloudCenDepth;
-
+			// 处理坐标为负的情况（修正分块索引）
 			if (t_w_curr.x() + 25.0 < 0)
 				centerCubeI--;
 			if (t_w_curr.y() + 25.0 < 0)
 				centerCubeJ--;
 			if (t_w_curr.z() + 25.0 < 0)
 				centerCubeK--;
-
+			// 调整X方向分块（当中心索引过小时，整体右移分块）
 			while (centerCubeI < 3)
 			{
 				for (int j = 0; j < laserCloudHeight; j++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
 					{ 
-						int i = laserCloudWidth - 1;
+						int i = laserCloudWidth - 1;	// 从最后一个分块开始
+                        // 获取当前分块的角点和平面点云指针
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k]; 
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-						for (; i >= 1; i--)
+						// 分块整体右移（覆盖前一个分块的数据）
+							for (; i >= 1; i--)
 						{
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudCornerArray[i - 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudSurfArray[i - 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						}
+						// 将原最后一个分块的数据移到第一个位置，并清空原最后一个分块
 						laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 							laserCloudCubeCornerPointer;
 						laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
@@ -372,29 +393,32 @@ void process()
 						laserCloudCubeSurfPointer->clear();
 					}
 				}
-
+				// 更新中心索引和全局分块偏移量
 				centerCubeI++;
 				laserCloudCenWidth++;
 			}
-
+			// 调整X方向分块（当中心索引过大时，整体左移分块）
 			while (centerCubeI >= laserCloudWidth - 3)
 			{ 
 				for (int j = 0; j < laserCloudHeight; j++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
 					{
-						int i = 0;
+						int i = 0;		// 从第一个分块开始
+                        // 获取当前分块的角点和平面点云指针
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-						for (; i < laserCloudWidth - 1; i++)
+						// 分块整体左移（覆盖后一个分块的数据）
+							for (; i < laserCloudWidth - 1; i++)
 						{
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudCornerArray[i + 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudSurfArray[i + 1 + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						}
+						// 将原第一个分块的数据移到最后一个位置，并清空原第一个分块
 						laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 							laserCloudCubeCornerPointer;
 						laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
@@ -403,29 +427,32 @@ void process()
 						laserCloudCubeSurfPointer->clear();
 					}
 				}
-
+				// 更新中心索引和全局分块偏移量
 				centerCubeI--;
 				laserCloudCenWidth--;
 			}
-
+			// 调整Y方向分块（当中心索引过小时，整体上移分块）
 			while (centerCubeJ < 3)
 			{
 				for (int i = 0; i < laserCloudWidth; i++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
 					{
-						int j = laserCloudHeight - 1;
+						int j = laserCloudHeight - 1;	// 从最后一个分块开始
+                        // 获取当前分块的角点和平面点云指针
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-						for (; j >= 1; j--)
+						// 分块整体上移（覆盖前一个分块的数据）
+							for (; j >= 1; j--)
 						{
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudCornerArray[i + laserCloudWidth * (j - 1) + laserCloudWidth * laserCloudHeight * k];
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudSurfArray[i + laserCloudWidth * (j - 1) + laserCloudWidth * laserCloudHeight * k];
 						}
+						// 将原最后一个分块的数据移到第一个位置，并清空原最后一个分块
 						laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 							laserCloudCubeCornerPointer;
 						laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
@@ -434,29 +461,32 @@ void process()
 						laserCloudCubeSurfPointer->clear();
 					}
 				}
-
+				// 更新中心索引和全局分块偏移量
 				centerCubeJ++;
 				laserCloudCenHeight++;
 			}
-
+			// 调整Y方向分块（当中心索引过大时，整体下移分块）
 			while (centerCubeJ >= laserCloudHeight - 3)
 			{
 				for (int i = 0; i < laserCloudWidth; i++)
 				{
 					for (int k = 0; k < laserCloudDepth; k++)
 					{
-						int j = 0;
+						int j = 0;		// 从第一个分块开始
+                        // 获取当前分块的角点和平面点云指针
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-						for (; j < laserCloudHeight - 1; j++)
+						// 分块整体下移（覆盖后一个分块的数据）
+							for (; j < laserCloudHeight - 1; j++)
 						{
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudCornerArray[i + laserCloudWidth * (j + 1) + laserCloudWidth * laserCloudHeight * k];
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudSurfArray[i + laserCloudWidth * (j + 1) + laserCloudWidth * laserCloudHeight * k];
 						}
+						// 将原第一个分块的数据移到最后一个位置，并清空原第一个分块
 						laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 							laserCloudCubeCornerPointer;
 						laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
@@ -465,29 +495,32 @@ void process()
 						laserCloudCubeSurfPointer->clear();
 					}
 				}
-
+				// 更新中心索引和全局分块偏移量
 				centerCubeJ--;
 				laserCloudCenHeight--;
 			}
-
+			// 调整Z方向分块（当中心索引过小时，整体后移分块）
 			while (centerCubeK < 3)
 			{
 				for (int i = 0; i < laserCloudWidth; i++)
 				{
 					for (int j = 0; j < laserCloudHeight; j++)
 					{
-						int k = laserCloudDepth - 1;
+						int k = laserCloudDepth - 1;	// 从最后一个分块开始
+                        // 获取当前分块的角点和平面点云指针
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
-						for (; k >= 1; k--)
+						// 分块整体后移（覆盖前一个分块的数据）
+							for (; k >= 1; k--)
 						{
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * (k - 1)];
 							laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 								laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * (k - 1)];
 						}
+						// 将原最后一个分块的数据移到第一个位置，并清空原最后一个分块
 						laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
 							laserCloudCubeCornerPointer;
 						laserCloudSurfArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k] =
@@ -496,18 +529,19 @@ void process()
 						laserCloudCubeSurfPointer->clear();
 					}
 				}
-
+				// 更新中心索引和全局分块偏移量
 				centerCubeK++;
 				laserCloudCenDepth++;
 			}
-
+			// 调整Z方向分块（当中心索引过大时，整体前移分块）
 			while (centerCubeK >= laserCloudDepth - 3)
 			{
 				for (int i = 0; i < laserCloudWidth; i++)
 				{
 					for (int j = 0; j < laserCloudHeight; j++)
 					{
-						int k = 0;
+						int k = 0;		// 从第一个分块开始
+                        // 获取当前分块的角点和平面点云指针
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeCornerPointer =
 							laserCloudCornerArray[i + laserCloudWidth * j + laserCloudWidth * laserCloudHeight * k];
 						pcl::PointCloud<PointType>::Ptr laserCloudCubeSurfPointer =
